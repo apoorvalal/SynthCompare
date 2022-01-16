@@ -60,11 +60,9 @@ RMSPE_Synth = function(j, ypre){
   # assign unit j as treated and other as as untreated, solve for weights
   y_j  = ypre[, j] |> as.matrix(); y_nj = ypre[, -j] |> as.matrix()
   sc_fit = synth(X1 = y_j, X0 = y_nj, Z1 = y_j, Z0 = y_nj)
-  if (is.null(wts)){ return(NULL) } else {
-    # compute prediction error
-    mse = (y_j -  y_nj  %*% sc_fit$solution.w)^2 |> mean() |> sqrt()
-    return(mse)
-  }
+  # compute prediction error
+  mse = (y_j -  y_nj  %*% sc_fit$solution.w)^2 |> mean() |> sqrt()
+  return(mse)
 }
 # %%
 compare_RMSPE = function(x) c(RMSPE_CVXSynth(x, y_ctrl_pre), RMSPE_Synth(x, y_ctrl_pre))
