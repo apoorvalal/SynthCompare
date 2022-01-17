@@ -1,0 +1,284 @@
+---
+title: Synth and CVXSynth Predictive Accuracy Comparison
+author: Apoorva Lal
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    self_contained: true
+    theme: flatly
+    highlight: tango
+    code_folding: show
+    toc: true
+    toc_float: false
+    toc_depth: 3
+    fig_width:  10
+    fig_height: 8
+---
+
+
+<!--- For HTML renders - selection from math_shortcuts.tex --->
+`r if (!knitr:::is_latex_output()) '
+$\\DeclareMathOperator*{\\argmin}{argmin}$
+$\\newcommand{\\var}{\\mathrm{Var}}$
+$\\newcommand{\\epsi}{\\varepsilon}$
+$\\newcommand{\\phii}{\\varphi}$
+$\\newcommand{\\tra}{^{\\top}}$
+$\\newcommand{\\sumin}{\\sum_{i=1}^n}$
+$\\newcommand{\\sumiN}{\\sum_{i=1}^n}$
+$\\newcommand{\\norm}[1]{\\left\\Vert{#1} \\right\\Vert}$
+$\\newcommand\\Bigpar[1]{\\left( #1 \\right )}$
+$\\newcommand\\Bigbr[1]{\\left[ #1 \\right ]}$
+$\\newcommand\\Bigcr[1]{\\left\\{ #1 \\right \\}}$
+$\\newcommand\\SetB[1]{\\left\\{ #1 \\right\\}}$
+$\\newcommand\\Sett[1]{\\mathcal{#1}}$
+$\\newcommand{\\Data}{\\mathcal{D}}$
+$\\newcommand{\\Ubr}[2]{\\underbrace{#1}_{\\text{#2}}}$
+$\\newcommand{\\Obr}[2]{ \\overbrace{#1}^{\\text{#2}}}$
+$\\newcommand{\\sumiN}{\\sum_{i=1}^N}$
+$\\newcommand{\\dydx}[2]{\\frac{\\partial #1}{\\partial #2}}$
+$\\newcommand\\Indic[1]{\\mathds{1}_{#1}}$
+$\\newcommand{\\Realm}[1]{\\mathbb{R}^{#1}}$
+$\\newcommand{\\Exp}[1]{\\mathbb{E}\\left[#1\\right]}$
+$\\newcommand{\\Expt}[2]{\\mathbb{E}_{#1}\\left[#2\\right]}$
+$\\newcommand{\\Var}[1]{\\mathbb{V}\\left[#1\\right]}$
+$\\newcommand{\\Covar}[1]{\\text{Cov}\\left[#1\\right]}$
+$\\newcommand{\\Prob}[1]{\\mathbf{Pr}\\left(#1\\right)}$
+$\\newcommand{\\Supp}[1]{\\text{Supp}\\left[#1\\right]}$
+$\\newcommand{\\doyx}{\\Prob{Y \\, |\\,\\mathsf{do} (X = x)}}$
+$\\newcommand{\\doo}[1]{\\Prob{Y |\\,\\mathsf{do} (#1) }}$
+$\\newcommand{\\R}{\\mathbb{R}}$
+$\\newcommand{\\Z}{\\mathbb{Z}}$
+$\\newcommand{\\wh}[1]{\\widehat{#1}} % Wide hat$
+$\\newcommand{\\wt}[1]{\\widetilde{#1}} % Wide tilde$
+$\\newcommand{\\wb}[1]{\\overline{#1}} % Wide bar$
+$\\newcommand\\Ol[1]{\\overline{#1}}$
+$\\newcommand\\Ul[1]{\\underline{#1}}$
+$\\newcommand\\Str[1]{#1^{*}}$
+$\\newcommand{\\F}{\\mathsf{F}}$
+$\\newcommand{\\ff}{\\mathsf{f}}$
+$\\newcommand{\\Cdf}[1]{\\mathbb{F}\\left(#1\\right)}$
+$\\newcommand{\\Cdff}[2]{\\mathbb{F}_{#1}\\left(#2\\right)}$
+$\\newcommand{\\Pdf}[1]{\\mathsf{f}\\left(#1\\right)}$
+$\\newcommand{\\Pdff}[2]{\\mathsf{f}_{#1}\\left(#2\\right)}$
+$\\newcommand{\\dd}{\\mathsf{d}}$
+$\\newcommand\\Normal[1]{\\mathcal{N} \\left( #1 \\right )}$
+$\\newcommand\\Unif[1]{\\mathsf{U} \\left[ #1 \\right ]}$
+$\\newcommand\\Bern[1]{\\mathsf{Bernoulli} \\left( #1 \\right )}$
+$\\newcommand\\Binom[1]{\\mathsf{Bin} \\left( #1 \\right )}$
+$\\newcommand\\Pois[1]{\\mathsf{Poi} \\left( #1 \\right )}$
+$\\newcommand\\BetaD[1]{\\mathsf{Beta} \\left( #1 \\right )}$
+$\\newcommand\\Diri[1]{\\mathsf{Dir} \\left( #1 \\right )}$
+$\\newcommand\\Gdist[1]{\\mathsf{Gamma} \\left( #1 \\right )}$
+$\\def\\mbf#1{\\mathbf{#1}}$
+$\\def\\mrm#1{\\mathrm{#1}}$
+$\\def\\mbi#1{\\boldsymbol{#1}}$
+$\\def\\ve#1{\\mbi{#1}} % Vector notation$
+$\\def\\vee#1{\\mathbf{#1}} % Vector notation$
+$\\newcommand{\\Mat}[1]{\\mathbf{#1}}$
+$\\newcommand{\\eucN}[1]{\\norm{#1}}$
+$\\newcommand{\\lzero}[1]{\\norm{#1}_0}$
+$\\newcommand{\\lone}[1]{\\norm{#1}_1}$
+$\\newcommand{\\ltwo}[1]{\\norm{#1}_2}$
+$\\newcommand{\\pnorm}[1]{\\norm{#1}_p}$
+'`
+
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+
+For each unit $j$ in the pre-treatment period, compute in-sample Root-Mean-Squared Prediction Error as
+
+$$
+\text{RMSPE} = \Bigpar{
+  \frac{1}{T_0} \sum_{t = 1}^{T_0}
+    \Bigpar{Y_{1t} - \sum_{j=2}^{J+1} \omega_j^* Y_{j,t}}^2
+  }^{1/2}
+$$
+
+```{r}
+rm(list = ls())
+library(pacman)
+p_load(data.table, patchwork, ggplot2, parallel, tictoc, knitr,
+  Synth, CVXR, synthdid)
+source("0CVXSynth.R")
+
+opts_chunk$set(echo=TRUE, autodep=TRUE, cache.comments=FALSE, cache=TRUE,
+               message=FALSE, warning=FALSE)
+```
+
+## workhorse functions
+
+```{r}
+# %% in-sample prediction error functions
+RMSPE_CVXSynth = function(j, ypre, solv = "MOSEK"){
+  # assign unit j as treated and other as as untreated, solve for weights
+  y_j  = ypre[, j]; y_nj = ypre[, -j]
+  wts = sc_solve(y_j, y_nj, solv = solv)
+  if (is.null(wts)){ return(NULL) } else {
+    # compute prediction error
+    mse = (y_j -  y_nj  %*% wts)^2 |> mean() |> sqrt()
+    return(mse)
+  }
+}
+
+# %%
+RMSPE_Synth = function(j, ypre){
+  # assign unit j as treated and other as as untreated, solve for weights
+  y_j  = ypre[, j] |> as.matrix(); y_nj = ypre[, -j] |> as.matrix()
+  sc_fit = synth(X1 = y_j, X0 = y_nj, Z1 = y_j, Z0 = y_nj)
+  # compute prediction error
+  mse = (y_j -  y_nj  %*% sc_fit$solution.w)^2 |> mean() |> sqrt()
+  return(mse)
+}
+
+
+compare_RMSPE = function(x, Ypre){
+  try(r1 <- RMSPE_CVXSynth(x, Ypre))
+  try(r2 <- RMSPE_Synth(x, Ypre))
+  if(exists("r1") & exists("r2")){
+    list(cvx_rmspe = r1, synth_rmspe = r2)
+  }else if(exists("r1")){
+    list(cvx_rmspe = r1)
+  } else {
+    list(synth_rmspe = r2)
+  }
+}
+
+```
+
+
+# German Reunification
+
+```{r}
+# %% data prep
+load('../data/ADH2015.RData')
+ADH2015$country = factor(ADH2015$country)
+pan = data.table(ADH2015)
+pan[, treat := ifelse(country == "West Germany" & year >= 1990, 1, 0)]
+treat_name = 'West Germany'
+T0 = pan[country == "West Germany" & treat != 1, nunique(year)]
+T1 = pan[country == "West Germany" & treat == 1, nunique(year)]
+
+# %% # number of post-treatment periods reshape to wide
+wide = pan[, .(country, year, gdp)] |> dcast(year ~ country, value.var = 'gdp')
+setcolorder(wide, c('year', treat_name))
+y_treat_pre = wide[1:T0, 2] |> as.matrix()
+y_ctrl_pre  = wide[1:T0, -(1:2)] |> as.matrix()
+```
+
+## compare weights
+
+```{r,include=F}
+# %% # Fit SC using Synth
+tic()
+sc_fit = synth(X1 = y_treat_pre, X0 = y_ctrl_pre, Z1 = y_treat_pre, Z0 = y_ctrl_pre)
+toc()
+# %% Fit SC using CVXR
+tic()
+ω_sc = sc_solve(y_treat_pre, y_ctrl_pre, solv = "MOSEK")
+toc()
+```
+
+```{r}
+# %%
+cbind(sc_fit$solution.w, ω_sc) |> round(3)
+```
+
+## RMSPE Comparison
+
+
+```{r, include=F}
+Ypre = cbind(y_treat_pre, y_ctrl_pre)
+RMSPE_comparison_GER = lapply(1:ncol(Ypre), compare_RMSPE, Ypre = Ypre)
+```
+
+```{r}
+names(RMSPE_comparison_GER) = colnames(Ypre)
+RMSPE_comparison_GER
+```
+
+
+# California Smoking
+
+```{r}
+data(california_prop99)
+caSmoking = panel.matrices(california_prop99)
+T0 = caSmoking$T0
+YMat = caSmoking$Y  |> t()
+CA = YMat[, ncol(YMat)]; NCA = YMat[, -ncol(YMat)];
+y_treat_pre = CA[1:T0] |> as.matrix()
+y_ctrl_pre  = NCA[1:T0,] |> as.matrix()
+```
+
+## Weights
+
+```{r, include=F}
+# %% # Fit SC using Synth
+tic()
+sc_fit = synth(X1 = y_treat_pre, X0 = y_ctrl_pre, Z1 = y_treat_pre, Z0 = y_ctrl_pre)
+toc()
+# %% Fit SC using CVXR
+tic()
+ω_sc = sc_solve(y_treat_pre, y_ctrl_pre, solv = "MOSEK")
+toc()
+```
+
+```{r}
+cbind(sc_fit$solution.w, ω_sc) |> round(3)
+```
+
+```{r, include=F}
+options(show.error.messages = FALSE)
+Ypre = cbind(y_treat_pre, y_ctrl_pre)
+RMSPE_comparison_CA = lapply(1:ncol(Ypre), compare_RMSPE, Ypre = Ypre)
+names(RMSPE_comparison_CA) = colnames(Ypre)
+```
+
+```{r}
+RMSPE_comparison_CA
+```
+
+# Basque
+
+```{r, basque}
+library(janitor)
+data(basque); setDT(basque)
+# drop national average
+basque = basque[regionname != "Spain (Espana)", .(regionno, regionname, year, gdpcap)]
+wide = basque |> dcast(year ~ regionname + regionno , value.var = 'gdpcap') |> clean_names()
+y_ctrl_pre  = wide[year <= 1969, -c('year', 'basque_country_pais_vasco_17')] |> as.matrix()
+y_treat_pre = wide[year <= 1969, basque_country_pais_vasco_17] |> as.matrix()
+```
+
+
+```{r, include=F}
+# %% # Fit SC using Synth
+tic()
+sc_fit = synth(X1 = y_treat_pre, X0 = y_ctrl_pre, Z1 = y_treat_pre, Z0 = y_ctrl_pre)
+toc()
+# %% Fit SC using CVXR
+tic()
+ω_sc = sc_solve(y_treat_pre, y_ctrl_pre, solv = "MOSEK")
+toc()
+```
+
+```{r}
+cbind(sc_fit$solution.w, ω_sc) |> round(3)
+```
+
+```{r, include=F}
+options(show.error.messages = FALSE)
+Ypre = cbind(y_treat_pre, y_ctrl_pre)
+RMSPE_comparison_basque = lapply(1:ncol(Ypre), compare_RMSPE, Ypre = Ypre)
+names(RMSPE_comparison_basque) = colnames(Ypre)
+```
+
+```{r}
+RMSPE_comparison_basque
+```
